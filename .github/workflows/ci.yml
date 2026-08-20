@@ -66,3 +66,19 @@ jobs:
 
       - name: Build Release
         run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Prepare Artifact
+        shell: bash
+        run: |
+          mkdir -p staging
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp "target/${{ matrix.target }}/release/firepwd-rs.exe" "staging/firepwd-rs-${{ matrix.target }}.exe"
+          else
+            cp "target/${{ matrix.target }}/release/firepwd-rs" "staging/firepwd-rs-${{ matrix.target }}"
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firepwd-rs-${{ matrix.target }}
+          path: staging/*
