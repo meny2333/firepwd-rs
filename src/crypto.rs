@@ -35,7 +35,7 @@ pub fn decrypt_moz_3des(
 
     // chp = SHA1(hp + entrySalt)
     let mut h2 = sha1::Sha1::new();
-    h2.update(&hp);
+    h2.update(hp);
     h2.update(entry_salt);
     let chp = h2.finalize();
 

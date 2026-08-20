@@ -5,7 +5,7 @@ mod login;
 
 use clap::Parser;
 use hex::encode as hexencode;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use asn1::{Asn1Value, get_integer, get_octet, parse_der_sequence, seq_get};
 use bsddb::read_bsddb;
@@ -134,7 +134,7 @@ fn find_firefox_profiles() -> Vec<PathBuf> {
 }
 
 /// Parse profiles.ini and return resolved profile directories.
-fn profiles_from_ini(ini_path: &PathBuf, base: &PathBuf) -> Vec<PathBuf> {
+fn profiles_from_ini(ini_path: &Path, base: &Path) -> Vec<PathBuf> {
     let mut result = Vec::new();
 
     let content = match std::fs::read_to_string(ini_path) {
@@ -266,7 +266,7 @@ fn main() {
 
 // ─── get_key ─────────────────────────────────────────────────────────────────
 
-fn get_key(master_password: &[u8], directory: &PathBuf, verbose: u8) -> Option<(Vec<u8>, String)> {
+fn get_key(master_password: &[u8], directory: &Path, verbose: u8) -> Option<(Vec<u8>, String)> {
     let key4 = directory.join("key4.db");
     let key3 = directory.join("key3.db");
 

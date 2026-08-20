@@ -2,9 +2,8 @@ use crate::asn1::{get_octet, parse_der_sequence, seq_get};
 
 use base64::{Engine as _, engine::general_purpose};
 use rusqlite::{Connection, OpenFlags};
-use serde_json;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // ─── Structs ──────────────────────────────────────────────────────────────────
 
@@ -66,7 +65,7 @@ pub fn decode_login_data(data: &str) -> Result<LoginField, Box<dyn std::error::E
 
 // ─── get_login_data ───────────────────────────────────────────────────────────
 
-pub fn get_login_data(directory: &PathBuf, verbose: u8) -> Vec<LoginEntry> {
+pub fn get_login_data(directory: &Path, verbose: u8) -> Vec<LoginEntry> {
     let json_file = directory.join("logins.json");
     let sqlite_file = directory.join("signons.sqlite");
 
