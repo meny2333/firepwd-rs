@@ -39,61 +39,89 @@ pub const CKA_ID: [u8; 16] = [
 // ─── Profile discovery ────────────────────────────────────────────────────────
 
 /// Return all candidate Firefox / Thunderbird profile directories
-/// found under the current user's home and all entries in /etc/passwd.
+/// found across Windows, macOS, and Linux.
 fn find_firefox_profiles() -> Vec<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
+    let mut search_dirs: Vec<PathBuf> = Vec::new();
 
-    // Relative paths that contain Firefox profiles
-    let profile_parents = [
-        ".mozilla/firefox",
-        ".mozilla-firefox",
-        "snap/firefox/common/.mozilla/firefox",
-        ".var/app/org.mozilla.firefox/.mozilla/firefox", // Flatpak
-        ".thunderbird",
-    ];
-
-    // Collect home directories from /etc/passwd + $HOME
-    let mut homes: Vec<PathBuf> = Vec::new();
-
-    if let Ok(content) = std::fs::read_to_string("/etc/passwd") {
-        for line in content.lines() {
-            let fields: Vec<&str> = line.split(':').collect();
-            if fields.len() >= 6 {
-                homes.push(PathBuf::from(fields[5]));
-            }
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(app_data) = std::env::var("APPDATA") {
+            let app_data_path = PathBuf::from(app_data);
+            search_dirs.push(app_data_path.join("Mozilla").join("Firefox"));
+            search_dirs.push(app_data_path.join("Thunderbird"));
+        }
+        if let Ok(user_profile) = std::env::var("USERPROFILE") {
+            let app_data_path = PathBuf::from(user_profile).join("AppData").join("Roaming");
+            search_dirs.push(app_data_path.join("Mozilla").join("Firefox"));
+            search_dirs.push(app_data_path.join("Thunderbird"));
         }
     }
 
-    if let Ok(home) = std::env::var("HOME") {
-        let p = PathBuf::from(home);
-        if !homes.contains(&p) {
-            homes.push(p);
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let home_path = PathBuf::from(home);
+            search_dirs.push(home_path.join("Library/Application Support/Firefox"));
+            search_dirs.push(home_path.join("Library/Application Support/Thunderbird"));
+            search_dirs.push(home_path.join("Library/Mozilla/Firefox"));
         }
     }
 
-    // For each home, check each profile parent directory
-    for home in &homes {
-        for parent in &profile_parents {
-            let base = home.join(parent);
-            if !base.is_dir() {
-                continue;
-            }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        let profile_parents = [
+            ".mozilla/firefox",
+            ".mozilla-firefox",
+            "snap/firefox/common/.mozilla/firefox",
+            ".var/app/org.mozilla.firefox/.mozilla/firefox", // Flatpak
+            ".thunderbird",
+        ];
 
-            // Read profiles.ini to find actual profile sub-directories
-            let ini_path = base.join("profiles.ini");
-            if ini_path.is_file() {
-                let profiles = profiles_from_ini(&ini_path, &base);
-                if profiles.is_empty() {
-                    // No ini entries but dir exists — try it directly
-                    candidates.push(base.clone());
-                } else {
-                    candidates.extend(profiles);
+        let mut homes: Vec<PathBuf> = Vec::new();
+
+        if let Ok(content) = std::fs::read_to_string("/etc/passwd") {
+            for line in content.lines() {
+                let fields: Vec<&str> = line.split(':').collect();
+                if fields.len() >= 6 {
+                    homes.push(PathBuf::from(fields[5]));
                 }
+            }
+        }
+
+        if let Ok(home) = std::env::var("HOME") {
+            let p = PathBuf::from(home);
+            if !homes.contains(&p) {
+                homes.push(p);
+            }
+        }
+
+        for home in &homes {
+            for parent in &profile_parents {
+                search_dirs.push(home.join(parent));
+            }
+        }
+    }
+
+    for base in &search_dirs {
+        if !base.is_dir() {
+            continue;
+        }
+
+        // Read profiles.ini to find actual profile sub-directories
+        let ini_path = base.join("profiles.ini");
+        if ini_path.is_file() {
+            let profiles = profiles_from_ini(&ini_path, base);
+            if profiles.is_empty() {
+                // No ini entries but dir exists — try it directly
+                candidates.push(base.clone());
             } else {
-                // No profiles.ini — maybe the directory IS the profile
-                if base.join("key4.db").exists() || base.join("key3.db").exists() {
-                    candidates.push(base.clone());
-                }
+                candidates.extend(profiles);
+            }
+        } else {
+            // No profiles.ini — maybe the directory IS the profile
+            if base.join("key4.db").exists() || base.join("key3.db").exists() {
+                candidates.push(base.clone());
             }
         }
     }
